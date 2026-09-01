@@ -1,0 +1,40 @@
+# Netlify hosts the React client only. The Express server and MongoDB live
+# elsewhere (Render + Atlas) because Netlify cannot run a persistent process
+# and this app needs Socket.io WebSockets for chat and notifications.
+#
+# Set VITE_API_URL in the Netlify UI (Site settings -> Environment variables)
+# to the deployed API, e.g. https://medconsult-api.onrender.com/api
+# It is read at BUILD time, so changing it requires a redeploy, not a restart.
+# client/src/lib/socket.js derives the socket origin from it by stripping
+# the /api suffix, so this one variable configures both REST and WebSocket.
+
+[build]
+  base    = "client"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# The client is a single-page app: react-router owns the routing, so every
+# path has to be served index.html and resolved in the browser. Without this
+# a refresh on /patient/doctors, or any link shared into the app, returns a
+# Netlify 404 because no such file exists on disk.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# Medical data: keep the app out of third-party frames and referrer logs.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "no-referrer"
+
+# Vite fingerprints asset filenames, so they can be cached indefinitely.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

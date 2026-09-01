@@ -636,12 +636,41 @@ stated in the project report.
 
 ## Deployment
 
-| Piece | Host | Notes |
-|---|---|---|
-| Frontend | Vercel | Root directory `client`, build `npm run build`, output `dist`. Set `VITE_API_URL` to the deployed API. |
-| Backend | Render | Root directory `server`, build `npm install`, start `npm start`. Add every `server/.env` value. |
-| Database | MongoDB Atlas | Free M0 cluster. Allow access from anywhere (`0.0.0.0/0`) so Render can connect. |
-| Keep-alive | cron-job.org | Ping `https://<your-api>/api/health` every 10 minutes so the instance does not cold-start mid-demo. |
+Three free services. Netlify cannot host the whole app on its own: the server
+holds open Socket.io WebSocket connections for chat and live notifications,
+which a static host and short-lived serverless functions cannot do.
 
-Set `CORS_ORIGINS` on the backend to your Vercel URL, and `CLIENT_URL` so
-email links point at the deployed frontend.
+| Piece | Host | Config |
+|---|---|---|
+| Frontend | Netlify | `netlify.toml` in the repo root sets base `client`, build `npm run build`, publish `dist`, and the SPA fallback redirect. |
+| Backend | Render | `render.yaml` in the repo root. Root dir `server`, build `npm ci`, start `npm start`, health check `/api/health`. |
+| Database | MongoDB Atlas | Free M0 cluster. Network access must allow `0.0.0.0/0` so Render can reach it. |
+| Keep-alive | cron-job.org | Ping `https://<api>/api/health` every 10 min so the free instance does not cold-start mid-demo. |
+
+### Order matters
+
+1. **Atlas first** - create the M0 cluster, a database user, allow `0.0.0.0/0`,
+   and copy the `mongodb+srv://` string. Nothing else works without it.
+2. **Render next** - deploy from `render.yaml` and fill in the prompted
+   secrets. You need the API URL before the frontend can be built.
+3. **Netlify last** - set `VITE_API_URL` to `https://<your-api>.onrender.com/api`
+   **before** the first build. It is compiled into the bundle, so changing it
+   later needs a redeploy, not a restart.
+4. **Close the loop** - set `CORS_ORIGINS` and `CLIENT_URL` on Render to the
+   Netlify origin (no trailing slash), then redeploy the API. Until you do,
+   every browser request is blocked by CORS.
+5. **Seed** - run `npm run seed` once against the Atlas database, from your
+   machine with `MONGO_URI` pointed at Atlas. Render's free plan has no shell.
+
+### Two things that will bite you
+
+- **Render free tier sleeps** after 15 minutes idle and takes 30-50s to wake.
+  The keep-alive cron mitigates this but does not eliminate it. Wake the API
+  before a live demo.
+- **Uploads on Render are ephemeral.** Without Cloudinary configured, files go
+  to local disk and are wiped on every redeploy. Configure `CLOUDINARY_*` for
+  anything beyond a demo.
+
+One env var drives both transports on the client: `client/src/lib/socket.js`
+derives the WebSocket origin from `VITE_API_URL` by stripping the `/api`
+suffix, so REST and Socket.io always agree.
