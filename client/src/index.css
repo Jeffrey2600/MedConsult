@@ -1,0 +1,336 @@
+@import 'tailwindcss';
+
+/* Display, body and data faces. Bundled locally rather than pulled from a CDN
+   for the same reason as the Indic fonts below: the app has to render
+   correctly offline and on a locked-down campus network. */
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource/public-sans/400.css';
+@import '@fontsource/public-sans/500.css';
+@import '@fontsource/public-sans/600.css';
+@import '@fontsource/public-sans/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+/* Indic scripts render as empty boxes on many Windows machines without an
+   explicit font. These are bundled locally rather than loaded from a CDN so
+   the app still renders correctly offline and on a locked-down campus network. */
+@import '@fontsource/noto-sans-tamil/400.css';
+@import '@fontsource/noto-sans-tamil/600.css';
+@import '@fontsource/noto-sans-devanagari/400.css';
+@import '@fontsource/noto-sans-devanagari/600.css';
+@import '@fontsource/noto-sans-telugu/400.css';
+@import '@fontsource/noto-sans-telugu/600.css';
+@import '@fontsource/noto-sans-malayalam/400.css';
+@import '@fontsource/noto-sans-malayalam/600.css';
+
+/*
+  ── MedConsult visual language ────────────────────────────────────────────
+  The product's one real claim is that somebody is always on call, at any
+  hour, in any specialisation. So the interface is built like a night-shift
+  board: ink-dark surfaces where the system reports its state, clinical paper
+  everywhere the user reads or types, and colour used as signal rather than
+  decoration.
+
+  Three colours carry meaning and must not be used for anything else:
+    brand  — interactive. If it is this colour, it can be clicked.
+    vital  — availability. A doctor is on call, a slot is free, a step is done.
+    urgent — emergency only. Never a heading, never an accent, never a hover
+             state. Diluting it costs a life-critical affordance its meaning.
+*/
+@theme {
+  /* Interactive. A clinical blue, deliberately cooler and deeper than the
+     stock UI blue so buttons read as instrument controls, not web widgets. */
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dce6ff;
+  --color-brand-200: #bccdff;
+  --color-brand-300: #8fadff;
+  --color-brand-400: #5f86fb;
+  --color-brand-500: #3b63f0;
+  --color-brand-600: #2447d6;
+  --color-brand-700: #1b36ac;
+  --color-brand-800: #182e85;
+  --color-brand-900: #172a68;
+
+  /* Availability. Reads as a live monitor on ink, as confirmation on paper. */
+  --color-vital-50: #e6fbf1;
+  --color-vital-100: #c4f5df;
+  --color-vital-200: #8cebc2;
+  --color-vital-300: #4fdca1;
+  --color-vital-400: #22c786;
+  --color-vital-500: #0fae70;
+  --color-vital-600: #098455;
+  --color-vital-700: #0a6f4a;
+
+  /* Emergency. Reserved — see the note above. */
+  --color-urgent-50: #ffedeb;
+  --color-urgent-100: #ffd9d5;
+  --color-urgent-300: #ff9084;
+  --color-urgent-500: #ff4d3d;
+  --color-urgent-600: #dc2f24;
+  --color-urgent-700: #b8241c;
+
+  /* The board. Every dark surface in the app is one of these. */
+  --color-ink-600: #2a5580;
+  --color-ink-700: #1b3a5c;
+  --color-ink-800: #12283f;
+  --color-ink-900: #0a1a2f;
+  --color-ink-950: #061320;
+
+  /* Page ground. A neutral paper — warmer than white, nowhere near cream. */
+  --color-paper: #f6f7f5;
+
+  /*
+    The rest of the app was built on Tailwind's stock slate / red / emerald /
+    amber, across roughly six hundred class names in forty-five files. Rather
+    than rewrite all of them — churn with real regression risk and no visual
+    upside — the four ramps are redefined here to belong to this palette.
+    Every existing `text-slate-600` or `bg-red-50` in the codebase picks up the
+    new identity without being touched, and the semantics they already encode
+    (grey = structure, red = danger, emerald = success, amber = caution) are
+    exactly the ones these ramps now carry.
+  */
+
+  /* Neutrals, pulled toward ink's hue so greys sit against navy rather than
+     fighting it. */
+  --color-slate-50: #f4f6f9;
+  --color-slate-100: #e7ecf2;
+  --color-slate-200: #d2dae5;
+  --color-slate-300: #adbccd;
+  --color-slate-400: #7d8ea6;
+  --color-slate-500: #596c85;
+  --color-slate-600: #43546a;
+  --color-slate-700: #344256;
+  --color-slate-800: #222e3f;
+  --color-slate-900: #141f2e;
+  --color-slate-950: #0a1421;
+
+  /* Danger, aligned exactly with `urgent` so the emergency colour is one
+     colour no matter which utility a screen happens to use. */
+  --color-red-50: #ffedeb;
+  --color-red-100: #ffd9d5;
+  --color-red-200: #ffc2bb;
+  --color-red-300: #ff9084;
+  --color-red-400: #ff6d5d;
+  --color-red-500: #ff4d3d;
+  --color-red-600: #dc2f24;
+  --color-red-700: #b8241c;
+  --color-red-800: #931d16;
+  --color-red-900: #7a1b15;
+
+  /* Success, aligned with `vital`. */
+  --color-emerald-50: #e6fbf1;
+  --color-emerald-100: #c4f5df;
+  --color-emerald-200: #8cebc2;
+  --color-emerald-300: #4fdca1;
+  --color-emerald-400: #22c786;
+  --color-emerald-500: #0fae70;
+  --color-emerald-600: #098455;
+  --color-emerald-700: #0a6f4a;
+  --color-emerald-800: #0a583c;
+  --color-emerald-900: #094832;
+
+  /* Caution. Deeper than stock amber, which is too light to carry white text
+     at badge sizes — these are used for "pending" and "urgent, not emergency". */
+  --color-amber-50: #fdf6e7;
+  --color-amber-100: #f9e7bf;
+  --color-amber-200: #f2d089;
+  --color-amber-300: #e3ae45;
+  --color-amber-400: #c2860f;
+  --color-amber-500: #9d6707;
+  --color-amber-600: #855507;
+  --color-amber-700: #6c460b;
+  --color-amber-800: #593b11;
+  --color-amber-900: #4a3212;
+
+  --font-display:
+    'Bricolage Grotesque Variable', 'Segoe UI', 'Noto Sans Tamil',
+    'Noto Sans Devanagari', 'Noto Sans Telugu', 'Noto Sans Malayalam', sans-serif;
+  --font-sans:
+    'Public Sans', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans Tamil',
+    'Noto Sans Devanagari', 'Noto Sans Telugu', 'Noto Sans Malayalam', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  /* Tightened from Tailwind's defaults. Every existing rounded-lg / rounded-xl
+     in the app inherits this, which is the point — precise, not pillowy. */
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.625rem;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink-900 antialiased;
+  }
+
+  /* Display face is applied by intent, not by tag, so a heading inside a dense
+     table or a form label keeps the body face and stays readable. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  /* Latin-only refinements, undone for the Indic scripts — see the utilities
+     layer, where the override has to live to outrank Tailwind's own leading
+     utilities. */
+
+  /* Keyboard focus stays clearly visible — several screens are form-heavy. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-600;
+  }
+
+  /* Motion in this app is orchestration, never essential information. Anyone
+     who has asked the OS to stop it gets the finished state immediately. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Tailwind v4's @apply only accepts real utilities, not other custom
+     classes, so the shared button base is applied to every variant here
+     rather than each variant applying `.btn`. */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5
+           text-sm font-semibold transition-all duration-150
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply bg-brand-600 text-white shadow-[0_1px_2px_rgba(10,26,47,0.16)]
+           hover:bg-brand-700 hover:shadow-[0_2px_8px_rgba(36,71,214,0.28)]
+           active:translate-y-px disabled:hover:shadow-none;
+  }
+  .btn-secondary {
+    @apply border border-ink-900/15 bg-white text-ink-800
+           hover:border-ink-900/25 hover:bg-ink-900/[0.03] active:translate-y-px;
+  }
+  .btn-danger {
+    @apply bg-urgent-600 text-white shadow-[0_1px_2px_rgba(10,26,47,0.16)]
+           hover:bg-urgent-700 hover:shadow-[0_2px_8px_rgba(229,53,42,0.3)]
+           active:translate-y-px disabled:hover:shadow-none;
+  }
+  .btn-ghost {
+    @apply text-ink-700 hover:bg-ink-900/[0.06];
+  }
+
+  .card {
+    @apply rounded-xl border border-ink-900/10 bg-white
+           shadow-[0_1px_2px_rgba(10,26,47,0.05)];
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-800;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-ink-900/15 bg-white px-3 py-2.5 text-sm
+           text-ink-900 transition-colors placeholder:text-ink-900/35
+           focus:border-brand-600 focus:ring-2 focus:ring-brand-100 focus:outline-none
+           disabled:bg-ink-900/[0.04];
+  }
+
+  .input-error {
+    @apply border-urgent-500 focus:border-urgent-600 focus:ring-urgent-100;
+  }
+
+  .field-error {
+    @apply mt-1 text-xs text-urgent-700;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  /* Small mono label above a heading. Used for section kickers and for any
+     value the user reads as data — a time, a count, a status. */
+  .eyebrow {
+    @apply font-mono text-[0.6875rem] font-medium tracking-[0.18em] uppercase;
+  }
+}
+
+@layer utilities {
+  /*
+    Tight tracking and tight leading are Latin display refinements. Devanagari,
+    Tamil, Telugu and Malayalam stack vowel signs above and below the base
+    glyph, so squeezing the lines makes marks from adjacent lines collide, and
+    negative tracking crowds the clusters. Both are reverted for those scripts.
+
+    This has to sit in the utilities layer: a heading carries a Tailwind
+    `leading-*` utility, and layer order decides the cascade before specificity
+    does, so the same rule in the base layer would silently lose.
+  */
+  html:not([lang='en']) .font-display {
+    letter-spacing: normal;
+    line-height: 1.35;
+  }
+
+  /*
+    The landing page loads as one orchestrated sequence rather than a set of
+    scattered effects: the board's hour segments sweep in, then the rows
+    settle. Elements are laid out in their final position and only the paint
+    is animated, so nothing reflows and nothing is hidden if the animation
+    never runs. `both` fill plus the reduced-motion override in the base layer
+    means a user who has asked for stillness lands directly on the end state.
+  */
+  .anim-rise {
+    animation: mc-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .anim-segment {
+    animation: mc-segment 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* The one continuous motion in the app: a slow breath on the live dot, so
+     the board reads as connected rather than as a screenshot. */
+  .anim-pulse-vital {
+    animation: mc-pulse-vital 2.4s ease-in-out infinite;
+  }
+
+  @keyframes mc-rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes mc-segment {
+    from {
+      opacity: 0;
+      transform: scaleY(0.25);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes mc-pulse-vital {
+    0%,
+    100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(79, 220, 161, 0.5);
+    }
+    50% {
+      opacity: 0.72;
+      box-shadow: 0 0 0 0.3rem rgba(79, 220, 161, 0);
+    }
+  }
+}

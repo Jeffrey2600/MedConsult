@@ -1,0 +1,17 @@
+[
+  { "id": "fb-1", "name": "Government General Hospital, Chennai", "kind": "hospital", "emergency": true, "phone": "+914425305000", "address": "Park Town, Chennai", "lat": 13.0827, "lng": 80.2757 },
+  { "id": "fb-2", "name": "Apollo Hospitals, Greams Road", "kind": "hospital", "emergency": true, "phone": "+914428293333", "address": "Greams Lane, Chennai", "lat": 13.0637, "lng": 80.2519 },
+  { "id": "fb-3", "name": "Christian Medical College, Vellore", "kind": "hospital", "emergency": true, "phone": "+914162281000", "address": "Ida Scudder Road, Vellore", "lat": 12.9245, "lng": 79.1355 },
+  { "id": "fb-4", "name": "Coimbatore Medical College Hospital", "kind": "hospital", "emergency": true, "phone": "+914222301393", "address": "Trichy Road, Coimbatore", "lat": 11.0074, "lng": 76.9663 },
+  { "id": "fb-5", "name": "Madurai Government Rajaji Hospital", "kind": "hospital", "emergency": true, "phone": "+914522532535", "address": "Panagal Road, Madurai", "lat": 9.9195, "lng": 78.1194 },
+  { "id": "fb-6", "name": "Government Medical College, Thiruvananthapuram", "kind": "hospital", "emergency": true, "phone": "+914712528300", "address": "Medical College, Thiruvananthapuram", "lat": 8.5241, "lng": 76.9366 },
+  { "id": "fb-7", "name": "Amrita Institute of Medical Sciences, Kochi", "kind": "hospital", "emergency": true, "phone": "+914842851234", "address": "Ponekkara, Kochi", "lat": 10.0261, "lng": 76.3006 },
+  { "id": "fb-8", "name": "Osmania General Hospital, Hyderabad", "kind": "hospital", "emergency": true, "phone": "+914024600146", "address": "Afzal Gunj, Hyderabad", "lat": 17.3728, "lng": 78.4744 },
+  { "id": "fb-9", "name": "Nizam's Institute of Medical Sciences, Hyderabad", "kind": "hospital", "emergency": true, "phone": "+914023489000", "address": "Punjagutta, Hyderabad", "lat": 17.4239, "lng": 78.4482 },
+  { "id": "fb-10", "name": "Victoria Hospital, Bengaluru", "kind": "hospital", "emergency": true, "phone": "+918026700447", "address": "Fort Road, Bengaluru", "lat": 12.9634, "lng": 77.5731 },
+  { "id": "fb-11", "name": "All India Institute of Medical Sciences, New Delhi", "kind": "hospital", "emergency": true, "phone": "+911126588500", "address": "Ansari Nagar, New Delhi", "lat": 28.5672, "lng": 77.2100 },
+  { "id": "fb-12", "name": "King Edward Memorial Hospital, Mumbai", "kind": "hospital", "emergency": true, "phone": "+912224107000", "address": "Parel, Mumbai", "lat": 19.0027, "lng": 72.8425 },
+  { "id": "fb-13", "name": "SSKM Hospital, Kolkata", "kind": "hospital", "emergency": true, "phone": "+913322234222", "address": "AJC Bose Road, Kolkata", "lat": 22.5390, "lng": 88.3428 },
+  { "id": "fb-14", "name": "Sassoon General Hospital, Pune", "kind": "hospital", "emergency": true, "phone": "+912026128000", "address": "Sassoon Road, Pune", "lat": 18.5286, "lng": 73.8748 },
+  { "id": "fb-15", "name": "Civil Hospital, Ahmedabad", "kind": "hospital", "emergency": true, "phone": "+917922683721", "address": "Asarwa, Ahmedabad", "lat": 23.0553, "lng": 72.6060 }
+]
