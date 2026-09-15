@@ -10,4 +10,5 @@ export { MedicalRecord } from './MedicalRecord.js';
 export { Notification } from './Notification.js';
 export { SosEvent } from './SosEvent.js';
 export { SymptomCheck } from './SymptomCheck.js';
+export { DocumentCheck } from './DocumentCheck.js';
 export { Setting, getSettings, getSetting, setSettings } from './Setting.js';

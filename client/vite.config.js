@@ -15,6 +15,15 @@ export default defineConfig({
     // temporary tunnel-based testing needs it explicitly allowed. Only
     // affects `vite dev`, never the production build.
     allowedHosts: ['.trycloudflare.com'],
+    // Mirrors the proxy below: client/.env uses a relative VITE_API_URL=/api,
+    // and that only resolves to the real API when something on this same
+    // origin forwards it. `preview` had this; `dev` did not, which silently
+    // broke every API call under `npm run dev` while `npm run preview`
+    // worked — the two were never actually equivalent until now.
+    proxy: {
+      '/api': { target: 'http://localhost:5000', changeOrigin: true },
+      '/socket.io': { target: 'http://localhost:5000', ws: true, changeOrigin: true },
+    },
   },
   // Serving the production build is the only practical way to demo through a
   // tunnel: `vite dev` ships every module unbundled, and at ~2s of tunnel

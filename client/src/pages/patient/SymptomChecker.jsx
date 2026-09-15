@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bot, Siren, AlertTriangle, Stethoscope, Info, Phone, History, Sparkles, ListChecks,
+  Mic, Square,
 } from 'lucide-react';
 
 import { PageHeader } from '../../components/DashboardLayout.jsx';
@@ -11,6 +12,7 @@ import { Spinner } from '../../components/Spinner.jsx';
 import { symptomApi } from '../../api/symptoms.js';
 import { toApiError } from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition.js';
 import { formatDateTime } from '../../lib/datetime.js';
 
 const URGENCY_STYLE = {
@@ -30,6 +32,27 @@ export default function SymptomChecker() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+
+  // Whatever was already typed when the mic was pressed, so speech is
+  // appended rather than overwriting a description the patient already typed.
+  const baseTextRef = useRef('');
+  const speech = useSpeechRecognition(i18n.resolvedLanguage);
+
+  useEffect(() => {
+    if (!speech.listening && !speech.interimText && !speech.finalText) return;
+    const spoken = `${speech.finalText}${speech.interimText}`.trim();
+    setText(spoken ? `${baseTextRef.current}${baseTextRef.current ? ' ' : ''}${spoken}` : baseTextRef.current);
+  }, [speech.finalText, speech.interimText, speech.listening]);
+
+  const toggleVoice = () => {
+    if (speech.listening) {
+      speech.stop();
+      return;
+    }
+    baseTextRef.current = text;
+    speech.reset();
+    speech.start();
+  };
 
   const { data: history } = useQuery({
     queryKey: ['symptom-checks'],
@@ -88,16 +111,60 @@ export default function SymptomChecker() {
         onSubmit={(e) => { e.preventDefault(); check.mutate(); }}
         className="card p-5"
       >
-        <label className="label" htmlFor="symptoms">{t('symptoms.describeLabel')}</label>
-        <textarea
-          id="symptoms"
-          rows={5}
-          className="input"
-          maxLength={2000}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={t('symptoms.placeholder')}
-        />
+        <div className="flex items-center justify-between">
+          <label className="label mb-0" htmlFor="symptoms">{t('symptoms.describeLabel')}</label>
+
+          {/* Hidden entirely rather than shown-disabled when the browser has
+              no speech engine (Firefox, Safari) — a control that can never
+              work is worse than no control, per this app's rule that every
+              optional capability degrades invisibly rather than breaking. */}
+          {speech.supported && (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                speech.listening
+                  ? 'bg-red-600 text-white'
+                  : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+              }`}
+              aria-pressed={speech.listening}
+            >
+              {speech.listening ? (
+                <>
+                  <Square className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('symptoms.voiceStop')}
+                </>
+              ) : (
+                <>
+                  <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('symptoms.voiceStart')}
+                </>
+              )}
+            </button>
+          )}
+        </div>
+        <div className="relative mt-1.5">
+          <textarea
+            id="symptoms"
+            rows={5}
+            className={`input ${speech.listening ? 'border-red-400 ring-2 ring-red-100' : ''}`}
+            maxLength={2000}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t('symptoms.placeholder')}
+          />
+          {speech.listening && (
+            <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-red-700 shadow-sm">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-600" aria-hidden="true" />
+              {t('symptoms.voiceListening')}
+            </span>
+          )}
+        </div>
+        {speech.errorCode && speech.errorCode !== 'unsupported' && speech.errorCode !== 'aborted' && (
+          <p className="mt-1.5 text-xs text-red-600">
+            {speech.errorCode === 'denied' ? t('symptoms.voiceDenied') : t('symptoms.voiceError')}
+          </p>
+        )}
         <div className="mt-1 flex justify-between text-xs text-slate-500">
           <span>{t('symptoms.detailHint')}</span>
           <span>{text.length}/2000</span>

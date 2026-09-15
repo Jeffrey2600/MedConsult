@@ -295,7 +295,12 @@
     "placeholder": "Type a message…",
     "send": "Send",
     "empty": "No messages yet. Say hello.",
-    "sendFailed": "The message could not be sent."
+    "sendFailed": "The message could not be sent.",
+    "translatedNote": "Translated from {{language}}",
+    "showingOriginal": "Showing original",
+    "showOriginal": "Show original",
+    "showTranslated": "Show translation",
+    "translatedForRecipient": "Auto-translated to {{language}} for them"
   },
   "records": {
     "subtitle": "Upload your reports once, and share them with whichever doctor you consult.",
@@ -384,7 +389,12 @@
     "source_red_flag_rules": "Flagged by the built-in emergency rules",
     "fallbackUsed": "AI unavailable — rules used",
     "history": "Previous checks",
-    "historyEmpty": "You have not used the symptom checker yet."
+    "historyEmpty": "You have not used the symptom checker yet.",
+    "voiceStart": "Speak",
+    "voiceStop": "Stop",
+    "voiceListening": "Listening…",
+    "voiceDenied": "Microphone access was denied. Allow it in your browser to use voice input.",
+    "voiceError": "Couldn't hear that. Check your microphone and try again, or type instead."
   },
   "sos": {
     "title": "Emergency",

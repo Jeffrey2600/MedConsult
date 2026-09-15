@@ -9,6 +9,11 @@ import { getSocket } from '../lib/socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatTime } from '../lib/datetime.js';
+import { LANGUAGES } from '../lib/i18n.js';
+
+/** Native-script name shown in "translated from X" captions — recognisable
+ *  regardless of which language the reader's own interface is in. */
+const nativeNameFor = (code) => LANGUAGES.find((l) => l.code === code)?.native ?? code;
 
 /**
  * Per-appointment text chat. History is fetched over REST so it survives a
@@ -23,7 +28,17 @@ export function ChatPanel({ appointmentId }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [showOriginal, setShowOriginal] = useState(() => new Set());
   const endRef = useRef(null);
+
+  const toggleOriginal = (id) => {
+    setShowOriginal((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const { data, isPending } = useQuery({
     queryKey: qk.messages(appointmentId),
@@ -39,6 +54,9 @@ export function ChatPanel({ appointmentId }) {
         senderId: String(m.sender?._id ?? m.sender),
         senderName: m.sender?.name ?? '',
         text: m.text,
+        translatedText: m.translatedText || '',
+        sourceLanguage: m.sourceLanguage || '',
+        translatedLanguage: m.translatedLanguage || '',
         createdAt: m.createdAt,
       }))
     );
@@ -101,6 +119,15 @@ export function ChatPanel({ appointmentId }) {
 
         {messages.map((m) => {
           const mine = String(m.senderId) === String(user?.id);
+          // The stored translation is only ever into the recipient's
+          // language, so it is only worth showing as the primary text on
+          // the other party's bubbles — on my own bubbles it would just be
+          // my own message back in a language I didn't write it in.
+          const hasIncomingTranslation = !mine && Boolean(m.translatedText);
+          const revealed = showOriginal.has(m.id);
+          const displayText =
+            hasIncomingTranslation && !revealed ? m.translatedText : m.text;
+
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div
@@ -110,7 +137,32 @@ export function ChatPanel({ appointmentId }) {
                     : 'rounded-bl-sm bg-slate-100 text-slate-800'
                 }`}
               >
-                <p className="text-sm break-words whitespace-pre-wrap">{m.text}</p>
+                <p className="text-sm break-words whitespace-pre-wrap">{displayText}</p>
+
+                {hasIncomingTranslation && (
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    {revealed
+                      ? t('chat.showingOriginal')
+                      : t('chat.translatedNote', { language: nativeNameFor(m.sourceLanguage) })}
+                    {' · '}
+                    <button
+                      type="button"
+                      onClick={() => toggleOriginal(m.id)}
+                      className="underline decoration-dotted hover:text-slate-600"
+                    >
+                      {revealed ? t('chat.showTranslated') : t('chat.showOriginal')}
+                    </button>
+                  </p>
+                )}
+
+                {mine && m.translatedText && (
+                  <p className="mt-1 text-[10px] text-brand-100">
+                    {t('chat.translatedForRecipient', {
+                      language: nativeNameFor(m.translatedLanguage),
+                    })}
+                  </p>
+                )}
+
                 <p className={`mt-0.5 text-[10px] ${mine ? 'text-brand-100' : 'text-slate-400'}`}>
                   {formatTime(m.createdAt)}
                 </p>

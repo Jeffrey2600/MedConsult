@@ -159,6 +159,81 @@ export async function geminiCheck(input) {
   return normaliseGeminiResult(parsed);
 }
 
+const TRANSLATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    translatedText: {
+      type: 'string',
+      description:
+        'The message translated into the target language, and nothing else — '
+        + 'no notes, no quotes, no repeating the original.',
+    },
+  },
+  required: ['translatedText'],
+};
+
+const TRANSLATE_SYSTEM_INSTRUCTION = `
+You are a translation engine embedded in a doctor-patient chat. Translate the
+given message faithfully into the target language.
+
+Rules:
+- Preserve the meaning, tone, and any medical terms precisely — this is a
+  clinical conversation, not casual chat.
+- Translate only. Do not answer, comment on, or add anything to the message.
+- If the message is already in the target language, or is not real text to
+  translate (an emoji, a number, a name), return it unchanged.
+- Keep formatting such as line breaks as close to the original as possible.
+`.trim();
+
+/**
+ * Translates one chat message for the recipient's benefit. Mirrors
+ * geminiCheck's contract: throws on any failure so the caller can fall back
+ * to sending the message untranslated rather than blocking or losing it.
+ */
+export async function geminiTranslate({ text, targetLanguage }) {
+  if (!client) throw new Error('Gemini is not configured');
+
+  const languageName = LANGUAGE_NAMES[targetLanguage] ?? 'English';
+
+  const request = client.models.generateContent({
+    model: env.gemini.model,
+    contents: [`Translate the following message into ${languageName}.`, '', `"""${text}"""`].join(
+      '\n'
+    ),
+    config: {
+      systemInstruction: TRANSLATE_SYSTEM_INSTRUCTION,
+      responseMimeType: 'application/json',
+      responseSchema: TRANSLATE_SCHEMA,
+      // Translation should be literal, not creative.
+      temperature: 0.1,
+      maxOutputTokens: 1024,
+    },
+  });
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`Gemini timed out after ${env.gemini.timeoutMs}ms`)),
+      env.gemini.timeoutMs
+    )
+  );
+
+  const response = await Promise.race([request, timeout]);
+  const raw = response?.text;
+  if (!raw) throw new Error('Gemini returned an empty response');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Gemini returned text that was not valid JSON');
+  }
+
+  const translatedText = typeof parsed.translatedText === 'string' ? parsed.translatedText.trim() : '';
+  if (!translatedText) throw new Error('Gemini returned an empty translation');
+
+  return translatedText.slice(0, 4000);
+}
+
 /**
  * The schema constrains the shape, not the sense. Anything unexpected is
  * corrected here rather than trusted, so a surprising reply cannot put an

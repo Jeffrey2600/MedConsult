@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { verifyToken } from '../middleware/auth.js';
 import { User, Appointment, Message } from '../models/index.js';
 import { ROLES } from '../utils/constants.js';
+import { geminiAvailable, geminiTranslate } from '../services/gemini.service.js';
 
 let io = null;
 
@@ -76,10 +77,47 @@ export function initSocket(server) {
           return ack?.({ ok: false, error: 'Not your appointment' });
         }
 
+        const otherId =
+          String(appt.patient) === id ? String(appt.doctor) : String(appt.patient);
+
+        // Best-effort translation for the recipient when the two
+        // participants read in different languages. Never blocks the send —
+        // a slow or unavailable Gemini just means it goes through as-is.
+        let translatedText = '';
+        let sourceLanguage = '';
+        let translatedLanguage = '';
+        if (geminiAvailable()) {
+          try {
+            const users = await User.find({ _id: { $in: [id, otherId] } })
+              .select('preferredLanguage')
+              .lean();
+            const senderLang =
+              users.find((u) => String(u._id) === id)?.preferredLanguage || 'en';
+            const recipientLang =
+              users.find((u) => String(u._id) === otherId)?.preferredLanguage || 'en';
+
+            if (senderLang !== recipientLang) {
+              translatedText = await geminiTranslate({
+                text: trimmed,
+                targetLanguage: recipientLang,
+              });
+              sourceLanguage = senderLang;
+              translatedLanguage = recipientLang;
+            }
+          } catch {
+            translatedText = '';
+            sourceLanguage = '';
+            translatedLanguage = '';
+          }
+        }
+
         const saved = await Message.create({
           appointment: appointmentId,
           sender: id,
           text: trimmed,
+          translatedText,
+          sourceLanguage,
+          translatedLanguage,
         });
 
         const payload = {
@@ -88,14 +126,15 @@ export function initSocket(server) {
           senderId: id,
           senderName: socket.user.name,
           text: saved.text,
+          translatedText: saved.translatedText,
+          sourceLanguage: saved.sourceLanguage,
+          translatedLanguage: saved.translatedLanguage,
           createdAt: saved.createdAt,
         };
 
         io.to(appointmentRoom(appointmentId)).emit('chat:message', payload);
 
         // Nudge the other party even if they are not in the room right now.
-        const otherId =
-          String(appt.patient) === id ? String(appt.doctor) : String(appt.patient);
         io.to(userRoom(otherId)).emit('chat:unread', {
           appointmentId: String(appointmentId),
         });
