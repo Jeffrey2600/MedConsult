@@ -23,6 +23,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: SEED_IF_EMPTY
+        value: "true"       # loads demo accounts only if the database has no users
       - key: NODE_VERSION
         value: "22"
       # Render injects PORT and RENDER_EXTERNAL_URL; the server reads both,
