@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { env } from '../config/env.js';
+import { isOriginAllowed } from '../config/env.js';
 import { verifyToken } from '../middleware/auth.js';
 import { User, Appointment, Message } from '../models/index.js';
 import { ROLES } from '../utils/constants.js';
@@ -11,9 +11,36 @@ const userRoom = (userId) => `user:${userId}`;
 const roleRoom = (role) => `role:${role}`;
 const appointmentRoom = (id) => `appointment:${id}`;
 
+/**
+ * Best-effort translation for one recipient, shared by chat messages and
+ * live call captions. Never throws — a slow or unavailable Gemini, or the
+ * two people sharing a language, just means the caller gets empty strings
+ * back and the original text goes through untranslated.
+ */
+async function translateForRecipient(senderId, recipientId, text) {
+  if (!geminiAvailable()) return { translatedText: '', sourceLanguage: '', translatedLanguage: '' };
+  try {
+    const users = await User.find({ _id: { $in: [senderId, recipientId] } })
+      .select('preferredLanguage')
+      .lean();
+    const senderLang = users.find((u) => String(u._id) === senderId)?.preferredLanguage || 'en';
+    const recipientLang =
+      users.find((u) => String(u._id) === recipientId)?.preferredLanguage || 'en';
+
+    if (senderLang === recipientLang) {
+      return { translatedText: '', sourceLanguage: '', translatedLanguage: '' };
+    }
+
+    const translatedText = await geminiTranslate({ text, targetLanguage: recipientLang });
+    return { translatedText, sourceLanguage: senderLang, translatedLanguage: recipientLang };
+  } catch {
+    return { translatedText: '', sourceLanguage: '', translatedLanguage: '' };
+  }
+}
+
 export function initSocket(server) {
   io = new Server(server, {
-    cors: { origin: env.corsOrigins, credentials: true },
+    cors: { origin: (origin, cb) => cb(null, isOriginAllowed(origin)), credentials: true },
     // Render's free tier supports websockets, but polling is kept as a
     // fallback for restrictive college/campus networks.
     transports: ['websocket', 'polling'],
@@ -80,36 +107,8 @@ export function initSocket(server) {
         const otherId =
           String(appt.patient) === id ? String(appt.doctor) : String(appt.patient);
 
-        // Best-effort translation for the recipient when the two
-        // participants read in different languages. Never blocks the send —
-        // a slow or unavailable Gemini just means it goes through as-is.
-        let translatedText = '';
-        let sourceLanguage = '';
-        let translatedLanguage = '';
-        if (geminiAvailable()) {
-          try {
-            const users = await User.find({ _id: { $in: [id, otherId] } })
-              .select('preferredLanguage')
-              .lean();
-            const senderLang =
-              users.find((u) => String(u._id) === id)?.preferredLanguage || 'en';
-            const recipientLang =
-              users.find((u) => String(u._id) === otherId)?.preferredLanguage || 'en';
-
-            if (senderLang !== recipientLang) {
-              translatedText = await geminiTranslate({
-                text: trimmed,
-                targetLanguage: recipientLang,
-              });
-              sourceLanguage = senderLang;
-              translatedLanguage = recipientLang;
-            }
-          } catch {
-            translatedText = '';
-            sourceLanguage = '';
-            translatedLanguage = '';
-          }
-        }
+        const { translatedText, sourceLanguage, translatedLanguage } =
+          await translateForRecipient(id, otherId, trimmed);
 
         const saved = await Message.create({
           appointment: appointmentId,
@@ -153,6 +152,40 @@ export function initSocket(server) {
         from: id,
         name: socket.user.name,
       });
+    });
+
+    /**
+     * Live translated captions during a call. Each side transcribes its own
+     * microphone locally (browser SpeechRecognition) and forwards finished
+     * phrases here; this only translates and relays them to the other
+     * party. Unlike chat, nothing is persisted — a caption is a live aid for
+     * the call, not part of the permanent record.
+     */
+    socket.on('call:caption', async ({ appointmentId, text } = {}) => {
+      try {
+        const trimmed = String(text || '').trim().slice(0, 500);
+        if (!trimmed) return;
+
+        const appt = await Appointment.findById(appointmentId).lean();
+        if (!appt || (String(appt.patient) !== id && String(appt.doctor) !== id)) return;
+
+        const otherId =
+          String(appt.patient) === id ? String(appt.doctor) : String(appt.patient);
+        const { translatedText, translatedLanguage } =
+          await translateForRecipient(id, otherId, trimmed);
+
+        io.to(userRoom(otherId)).emit('call:caption', {
+          appointmentId: String(appointmentId),
+          from: id,
+          name: socket.user.name,
+          text: trimmed,
+          translatedText,
+          targetLanguage: translatedLanguage,
+        });
+      } catch {
+        // A dropped caption is not worth surfacing — the call itself is
+        // unaffected either way.
+      }
     });
   });
 

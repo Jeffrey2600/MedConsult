@@ -1,10 +1,18 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import mongoose from 'mongoose';
 import { v2 as cloudinary } from 'cloudinary';
 import { env, features } from '../config/env.js';
 
-const LOCAL_DIR = path.resolve(process.cwd(), 'uploads');
+/**
+ * Without Cloudinary, files go into MongoDB GridFS rather than local disk:
+ * hosts like Render wipe the disk on every restart, so a disk fallback
+ * would silently lose every uploaded record and prescription PDF.
+ */
+const GRIDFS_PREFIX = 'gridfs:';
+const bucket = () =>
+  new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
 
 if (features.cloudinary) {
   cloudinary.config({
@@ -15,7 +23,7 @@ if (features.cloudinary) {
   });
   console.log(`[storage] Cloudinary configured (${env.cloudinary.cloudName})`);
 } else {
-  console.log('[storage] Cloudinary not configured — files are stored on local disk');
+  console.log('[storage] Cloudinary not configured — files are stored in MongoDB (GridFS)');
 }
 
 export const usingCloudinary = () => features.cloudinary;
@@ -38,20 +46,24 @@ export async function uploadBuffer({ buffer, folder, mimeType, originalName }) {
   const publicId = `${folder}/${randomId()}`;
 
   if (!features.cloudinary) {
-    // Local fallback keeps development working without a Cloudinary account.
     // The extension is derived from the sniffed mime type, never from the
     // user-supplied filename.
     const ext = extensionFor(mimeType);
-    const filePath = path.join(LOCAL_DIR, `${publicId}${ext}`);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, buffer);
+    const fileId = await new Promise((resolve, reject) => {
+      const stream = bucket().openUploadStream(`${publicId}${ext}`, {
+        metadata: { contentType: mimeType },
+      });
+      stream.once('finish', () => resolve(stream.id));
+      stream.once('error', reject);
+      stream.end(buffer);
+    });
 
     return {
       publicId,
       resourceType: 'local',
       format: ext.replace('.', ''),
       bytes: buffer.length,
-      localPath: path.relative(process.cwd(), filePath),
+      localPath: `${GRIDFS_PREFIX}${fileId}`,
     };
   }
 
@@ -111,9 +123,16 @@ export function signedUrl({ publicId, resourceType = 'raw' }) {
   return { url, token: null, expiresAt };
 }
 
+const gridFsId = (localPath) =>
+  new mongoose.Types.ObjectId(localPath.slice(GRIDFS_PREFIX.length));
+
 export async function destroyFile({ publicId, resourceType = 'raw', localPath }) {
   if (!features.cloudinary) {
-    if (localPath) await fs.unlink(path.resolve(process.cwd(), localPath)).catch(() => {});
+    if (localPath?.startsWith(GRIDFS_PREFIX)) {
+      await bucket().delete(gridFsId(localPath)).catch(() => {});
+    } else if (localPath) {
+      await fs.unlink(path.resolve(process.cwd(), localPath)).catch(() => {});
+    }
     return;
   }
   await cloudinary.uploader
@@ -121,7 +140,15 @@ export async function destroyFile({ publicId, resourceType = 'raw', localPath })
     .catch((err) => console.error('[storage] Could not delete asset:', err.message));
 }
 
+/** Reads a non-Cloudinary file. Plain paths are files from before GridFS. */
 export async function readLocalFile(localPath) {
+  if (localPath.startsWith(GRIDFS_PREFIX)) {
+    const chunks = [];
+    for await (const chunk of bucket().openDownloadStream(gridFsId(localPath))) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  }
   return fs.readFile(path.resolve(process.cwd(), localPath));
 }
 

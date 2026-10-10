@@ -30,10 +30,14 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
 
-  // Comma-separated list of origins allowed to call the API.
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173')
-    .split(',')
-    .map((o) => o.trim())
+  // Comma-separated list of origins allowed to call the API. On Render the
+  // service's own public URL is always allowed, because the client is served
+  // from that same origin and the browser still sends an Origin header.
+  corsOrigins: [
+    ...(process.env.CORS_ORIGINS || 'http://localhost:5173').split(','),
+    process.env.RENDER_EXTERNAL_URL || '',
+  ]
+    .map((o) => o.trim().replace(/\/$/, ''))
     .filter(Boolean),
 
   // Video: 'agora' uses the Agora SDK + server-minted tokens,
@@ -112,7 +116,15 @@ export const env = {
     },
   },
 
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  clientUrl: process.env.CLIENT_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173',
+
+  // Per-window caps. Demo accounts are shared by everyone at a showcase, so
+  // a deployment can raise these without a code change.
+  limits: {
+    apiPer15Min: Number(process.env.API_REQUESTS_PER_15MIN) || 300,
+    authPer15Min: Number(process.env.AUTH_ATTEMPTS_PER_15MIN) || 10,
+    symptomChecksPerHour: Number(process.env.SYMPTOM_CHECKS_PER_HOUR) || 10,
+  },
   isProd: (process.env.NODE_ENV || 'development') === 'production',
 
   // Escape hatch for automated tests, which log in far more often than a
@@ -163,3 +175,18 @@ export const features = {
 };
 
 features.whatsapp = Boolean(features.whatsappProvider);
+
+const TRYCLOUDFLARE_ORIGIN = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
+
+/**
+ * Shared by the REST CORS middleware and the Socket.io server. A quick
+ * Cloudflare Tunnel gets a random *.trycloudflare.com subdomain every time
+ * it starts, purely to demo the local dev server from another device —
+ * mirrors the allowedHosts entry in client/vite.config.js for the same
+ * purpose. Never relaxed in production, where CORS_ORIGINS is authoritative.
+ */
+export function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (env.corsOrigins.includes(origin)) return true;
+  return !env.isProd && TRYCLOUDFLARE_ORIGIN.test(origin);
+}

@@ -1,8 +1,8 @@
-# Render blueprint for the MedConsult API.
+# Render blueprint for MedConsult: one web service serving both the React
+# client and the Express/Socket.io API from the same origin.
 #
-# Render runs the Express server, which Netlify cannot: the app holds open
-# Socket.io WebSocket connections for chat and live notifications, and a
-# serverless function cannot do that.
+# One service means one URL, no CORS configuration, and Socket.io connecting
+# straight back to the page's own origin. MongoDB lives on Atlas (free M0).
 #
 # To use: Render dashboard -> New -> Blueprint -> point at this repo.
 # Secrets are marked sync:false so they are never committed; Render prompts
@@ -10,40 +10,47 @@
 
 services:
   - type: web
-    name: medconsult-api
+    name: medconsult
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm ci
-    startCommand: npm start
-
-    # Render restarts the service if this stops returning 200. It is also the
-    # endpoint to point a keep-alive cron at (see the note on cold starts).
+    # Vite is a devDependency, and NODE_ENV=production would otherwise make
+    # npm skip it, so the client install includes dev deps explicitly.
+    buildCommand: cd client && npm ci --include=dev && npm run build && cd ../server && npm ci --omit=dev
+    startCommand: cd server && npm start
     healthCheckPath: /api/health
+    autoDeploy: true
 
     envVars:
       - key: NODE_ENV
         value: production
-      # Render injects PORT; server.js already reads process.env.PORT.
+      - key: NODE_VERSION
+        value: "22"
+      # Render injects PORT and RENDER_EXTERNAL_URL; the server reads both,
+      # so the service's own URL is allowed by CORS without configuring it.
 
       # --- required -------------------------------------------------------
       - key: MONGO_URI
         sync: false          # mongodb+srv://... from MongoDB Atlas
       - key: JWT_SECRET
-        sync: false          # generate: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+        generateValue: true  # Render generates a strong random value
 
-      # Must include the Netlify site origin or every browser request is
-      # blocked by CORS. No trailing slash. Comma-separated for several.
-      - key: CORS_ORIGINS
-        sync: false          # e.g. https://medconsult.netlify.app
-      - key: CLIENT_URL
-        sync: false          # same origin; used to build links inside emails
-
-      # --- optional, each degrades gracefully if left unset ---------------
+      # --- AI -------------------------------------------------------------
       - key: GEMINI_API_KEY
         sync: false          # without it the rule-based symptom engine answers
       - key: GEMINI_MODEL
         value: gemini-flash-lite-latest
+      - key: GEMINI_TIMEOUT_MS
+        value: "12000"
+
+      # --- demo-friendly limits (shared demo accounts at a showcase) -------
+      - key: API_REQUESTS_PER_15MIN
+        value: "2000"
+      - key: AUTH_ATTEMPTS_PER_15MIN
+        value: "20"
+      - key: SYMPTOM_CHECKS_PER_HOUR
+        value: "60"
+
+      # --- optional, each degrades gracefully if left unset ---------------
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -55,11 +62,11 @@ services:
       - key: MAIL_FROM
         sync: false
       - key: CLOUDINARY_CLOUD_NAME
-        sync: false          # without it uploads fall back to local disk,
+        sync: false          # without it, uploads are stored in MongoDB GridFS
       - key: CLOUDINARY_API_KEY
-        sync: false          # which on Render is EPHEMERAL - files vanish on
+        sync: false
       - key: CLOUDINARY_API_SECRET
-        sync: false          # redeploy. Configure this for real use.
+        sync: false
       - key: AGORA_APP_ID
         sync: false          # without it video falls back to a Jitsi iframe
       - key: AGORA_APP_CERTIFICATE
@@ -68,10 +75,3 @@ services:
         value: callmebot
       - key: CALLMEBOT_ENABLED
         value: "true"
-      - key: CALLMEBOT_API_KEY
-        sync: false
-
-      # Rate limiting cannot be disabled in production regardless of this
-      # value - see server/src/config/env.js - but keep it explicit.
-      - key: DISABLE_RATE_LIMITS
-        value: "false"

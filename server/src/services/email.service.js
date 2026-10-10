@@ -70,6 +70,12 @@ async function buildTransporter() {
     port: env.mail.port,
     secure: env.mail.port === 465,
     auth: { user: env.mail.user, pass: env.mail.pass },
+    // nodemailer's defaults wait up to two minutes for a connection. Some
+    // hosts block outbound SMTP outright, and the SOS endpoint awaits its
+    // email, so fail fast rather than leave an emergency alert spinning.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 }
 

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Video, Clock, AlertTriangle, MessageSquare, X } from 'lucide-react';
+import {
+  ArrowLeft, Video, Clock, AlertTriangle, MessageSquare, X, Captions, CaptionsOff,
+} from 'lucide-react';
 
 import { EmptyState } from '../../components/DashboardLayout.jsx';
 import { FullPageSpinner } from '../../components/Spinner.jsx';
@@ -16,6 +18,7 @@ import { qk } from '../../lib/queryClient.js';
 import { toApiError } from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSocketConnection, useSocketEvent } from '../../hooks/useSocket.js';
+import { useLiveCaptions } from '../../hooks/useLiveCaptions.js';
 import { formatDateTime, formatTime } from '../../lib/datetime.js';
 
 /**
@@ -35,6 +38,7 @@ export default function ConsultRoom() {
   const [panel, setPanel] = useState('chat');
 
   useSocketConnection();
+  const captions = useLiveCaptions(id);
 
   const { data: appointmentData, isPending: loadingAppointment, isError } = useQuery({
     queryKey: qk.appointment(id),
@@ -141,6 +145,76 @@ export default function ConsultRoom() {
 
             {credentials?.provider === 'jitsi' && (
               <JitsiStage room={credentials.jitsiRoom} displayName={user?.name ?? ''} />
+            )}
+
+            {/* Neither video stage exposes the call's own audio to the page
+                (Jitsi in particular is a cross-origin iframe), so captions
+                are built from each side's own microphone instead — captured
+                independently of whichever call is running, translated, and
+                relayed to the other party. */}
+            {credentials && captions.supported && (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={captions.toggle}
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        captions.enabled
+                          ? 'bg-red-600 text-white'
+                          : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+                      }`}
+                      aria-pressed={captions.enabled}
+                    >
+                      {captions.enabled ? (
+                        <CaptionsOff className="h-3.5 w-3.5" aria-hidden="true" />
+                      ) : (
+                        <Captions className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {captions.enabled ? t('captions.stop') : t('captions.start')}
+                    </button>
+
+                    {captions.enabled && (
+                      <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={captions.readAloud}
+                          onChange={(e) => captions.setReadAloud(e.target.checked)}
+                        />
+                        {t('captions.readAloud')}
+                      </label>
+                    )}
+                  </div>
+
+                  {captions.enabled && captions.listening && (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-red-600">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-600" aria-hidden="true" />
+                      {t('captions.listening')}
+                    </span>
+                  )}
+                </div>
+
+                {captions.enabled
+                  && captions.errorCode
+                  && !['unsupported', 'aborted', 'no-speech'].includes(captions.errorCode) && (
+                  <p className="mt-2 text-xs text-red-600">
+                    {captions.errorCode === 'denied' ? t('captions.micDenied') : t('captions.micError')}
+                  </p>
+                )}
+
+                {captions.enabled && (
+                  <p className="mt-2.5 min-h-[1.5rem] text-sm leading-relaxed text-slate-800">
+                    {captions.incoming ? (
+                      <>
+                        <span className="font-medium">{captions.incoming.name}: </span>
+                        {captions.incoming.translatedText || captions.incoming.text}
+                      </>
+                    ) : (
+                      <span className="text-slate-400">{t('captions.waiting')}</span>
+                    )}
+                  </p>
+                )}
+              </div>
             )}
 
             {credentials && (
