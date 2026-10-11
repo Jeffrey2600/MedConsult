@@ -25,7 +25,16 @@ const bool = (value, fallback = false) => {
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 5000,
-  mongoUri: process.env.MONGO_URI,
+  // MONGO_PASSWORD, when set, replaces a <db_password> or PASSWORD
+  // placeholder in MONGO_URI. Hosting dashboards are far less error-prone
+  // when the password is pasted into its own field than spliced by hand into
+  // the middle of a connection string.
+  mongoUri: process.env.MONGO_PASSWORD
+    ? process.env.MONGO_URI.replace(
+        /<db_password>|PASSWORD/,
+        encodeURIComponent(process.env.MONGO_PASSWORD.trim())
+      )
+    : process.env.MONGO_URI,
 
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',

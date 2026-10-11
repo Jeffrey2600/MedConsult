@@ -32,7 +32,9 @@ services:
 
       # --- required -------------------------------------------------------
       - key: MONGO_URI
-        sync: false          # mongodb+srv://... from MongoDB Atlas
+        sync: false          # mongodb+srv://user:PASSWORD@host/medconsult?... (no secret)
+      - key: MONGO_PASSWORD
+        sync: false          # the Atlas database user password, on its own
       - key: JWT_SECRET
         generateValue: true  # Render generates a strong random value
 
