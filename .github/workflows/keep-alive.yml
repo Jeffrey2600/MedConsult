@@ -1,0 +1,19 @@
+# Render's free tier sleeps after 15 minutes idle, and the first visit after
+# that waits ~50s for a cold start. Pinging every 10 minutes keeps the demo
+# instant during the day in India. It deliberately stops overnight: free web
+# services share 750 instance hours a month per account, and running this
+# 24/7 would use nearly all of them.
+name: Keep demo awake
+
+on:
+  schedule:
+    # 01:00-17:59 UTC = 06:30-23:29 IST
+    - cron: '*/10 1-17 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: curl -fsS --retry 3 --retry-delay 20 --max-time 90 https://medconsult-k7ab.onrender.com/api/health
